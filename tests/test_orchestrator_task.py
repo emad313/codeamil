@@ -106,6 +106,29 @@ def main():
         assert "non-empty" in state.error
         print("PASS: empty tasks are rejected")
 
+        # File changes are approval-gated before reaching the filesystem.
+        agent = make_orchestrator(
+            workspace,
+            [
+                (
+                    '{"tool_call":{"name":"write_file","arguments":'
+                    '{"relative_path":"created.txt","content":"safe"}}}'
+                ),
+                '{"final_answer":"Change was declined."}',
+            ],
+        )
+        approvals = []
+        state = agent.run_task(
+            "Create a file",
+            approve_file_change=lambda path, content, explanation: (
+                approvals.append(path) or False
+            ),
+        )
+        assert state.status == "completed"
+        assert approvals == ["created.txt"]
+        assert not (workspace / "created.txt").exists()
+        print("PASS: file changes require explicit approval")
+
     print("All task-loop tests passed.")
 
 

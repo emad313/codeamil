@@ -6,6 +6,75 @@ from app.tools.filesystem import WorkspaceFileSystem
 from app.tools.registry import ToolRegistry
 
 
+def test_argument_type_validation() -> None:
+    registry = ToolRegistry()
+    calls = []
+
+    registry.register(
+        name="example",
+        description="Test argument validation.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "count": {"type": "integer"},
+                "labels": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                },
+            },
+            "required": ["count", "labels"],
+            "additionalProperties": False,
+        },
+        handler=lambda count, labels: calls.append((count, labels))
+        or {"count": count, "labels": labels},
+    )
+
+    assert registry.execute(
+        "example",
+        {"count": "5", "labels": ["valid"]},
+    )["ok"] is False
+
+    assert registry.execute(
+        "example",
+        {"count": True, "labels": ["valid"]},
+    )["ok"] is False
+
+    assert registry.execute(
+        "example",
+        {"count": 5, "labels": [123]},
+    )["ok"] is False
+
+    assert registry.execute(
+        "example",
+        {"count": 5, "labels": []},
+    )["ok"] is False
+
+    assert registry.execute(
+        "example",
+        {"labels": ["valid"]},
+    )["ok"] is False
+
+    assert calls == []
+
+    result = registry.execute(
+        "example",
+        {"count": 5, "labels": ["valid"]},
+    )
+
+    assert result == {
+        "ok": True,
+        "result": {"count": 5, "labels": ["valid"]},
+    }
+    assert calls == [(5, ["valid"])]
+
+    print("PASS: invalid argument types are rejected")
+    print("PASS: invalid array items and empty arrays are rejected")
+    print("PASS: missing required arguments are rejected")
+    print("PASS: invalid arguments never reach the handler")
+    print("PASS: valid arguments execute successfully")
+
+
 def main() -> None:
     with TemporaryDirectory() as temp_dir:
         workspace = Path(temp_dir)
@@ -59,15 +128,20 @@ def main() -> None:
         )
 
         print("\n--- Unknown Tool Test ---")
-        print(registry.execute("delete_everything", {}))
+        unknown = registry.execute("delete_everything", {})
+        print(unknown)
+        assert unknown["ok"] is False
 
         print("\n--- Invalid Argument Test ---")
-        print(
-            registry.execute(
-                "read_file",
-                {"unexpected": "value"},
-            )
+        invalid = registry.execute(
+            "read_file",
+            {"unexpected": "value"},
         )
+        print(invalid)
+        assert invalid["ok"] is False
+
+    test_argument_type_validation()
+    print("\nAll registry tests passed.")
 
 
 if __name__ == "__main__":

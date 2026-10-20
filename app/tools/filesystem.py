@@ -1,5 +1,8 @@
 
+import os
 from pathlib import Path
+
+from app.tools.search import WorkspaceSearch
 
 
 class WorkspaceFileSystem:
@@ -21,9 +24,13 @@ class WorkspaceFileSystem:
             raise ValueError(
                 f"Workspace directory does not exist: {self.workspace}"
             )
+        self.search = WorkspaceSearch(self.workspace, self.IGNORED_DIRS)
 
     def _resolve_path(self, relative_path: str) -> Path:
         """Resolve a path and reject paths outside the workspace."""
+        if not isinstance(relative_path, str) or not relative_path.strip():
+            raise ValueError("A non-empty relative path is required.")
+
         path = (self.workspace / relative_path).resolve()
 
         if not path.is_relative_to(self.workspace):
@@ -38,6 +45,12 @@ class WorkspaceFileSystem:
         relative_path: str = ".",
         max_files: int = 200,
     ) -> list[str]:
+        if not isinstance(max_files, int) or isinstance(max_files, bool):
+            raise ValueError("max_files must be an integer.")
+
+        if max_files < 1:
+            raise ValueError("max_files must be at least 1.")
+
         directory = self._resolve_path(relative_path)
 
         if not directory.is_dir():
@@ -45,17 +58,26 @@ class WorkspaceFileSystem:
 
         results: list[str] = []
 
-        for path in sorted(directory.rglob("*")):
-            if any(part in self.IGNORED_DIRS for part in path.parts):
-                continue
+        for current, directories, filenames in os.walk(
+            directory, topdown=True, followlinks=False
+        ):
+            current_path = Path(current)
+            directories[:] = sorted(
+                name for name in directories
+                if name not in self.IGNORED_DIRS
+                and not (current_path / name).is_symlink()
+            )
 
-            if path.is_file():
-                results.append(
-                    path.relative_to(self.workspace).as_posix()
-                )
+            for filename in sorted(filenames):
+                path = current_path / filename
+                if path.is_symlink() or any(
+                    part in self.IGNORED_DIRS for part in path.parts
+                ):
+                    continue
 
+                results.append(path.relative_to(self.workspace).as_posix())
                 if len(results) >= max_files:
-                    break
+                    return results
 
         return results
 
@@ -76,41 +98,18 @@ class WorkspaceFileSystem:
         if not query:
             raise ValueError("Search query cannot be empty.")
 
+        if not isinstance(max_results, int) or isinstance(max_results, bool):
+            raise ValueError("max_results must be an integer.")
+
+        if max_results < 1:
+            raise ValueError("max_results must be at least 1.")
+
         directory = self._resolve_path(relative_path)
 
         if not directory.is_dir():
             raise NotADirectoryError(str(directory))
 
-        results: list[dict[str, str | int]] = []
-
-        for path in sorted(directory.rglob("*")):
-            if any(part in self.IGNORED_DIRS for part in path.parts):
-                continue
-
-            if not path.is_file():
-                continue
-
-            try:
-                content = path.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
-                continue
-
-            for line_number, line in enumerate(
-                content.splitlines(), start=1
-            ):
-                if query.casefold() in line.casefold():
-                    results.append({
-                        "file": path.relative_to(
-                            self.workspace
-                        ).as_posix(),
-                        "line": line_number,
-                        "text": line.strip(),
-                    })
-
-                    if len(results) >= max_results:
-                        return results
-
-        return results
+        return self.search.text(query, relative_path, max_results)
 
     def write_file(
         self,

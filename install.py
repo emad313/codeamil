@@ -36,8 +36,13 @@ def get_user_scripts(python: Path) -> Path:
     return scripts
 
 
-def install_codeamil(python: Path, scripts: Path) -> None:
+def install_codeamil(
+    python: Path,
+    scripts: Path,
+    source: Path | None = None,
+) -> None:
     """Install CodeAmil into the selected interpreter's user environment."""
+    package_source = str(source) if source and (source / "pyproject.toml").is_file() else REPO_URL
     subprocess.check_call(
         [
             str(python),
@@ -47,7 +52,7 @@ def install_codeamil(python: Path, scripts: Path) -> None:
             "--user",
             "--upgrade",
             "--no-warn-script-location",
-            REPO_URL,
+            package_source,
         ]
     )
 
@@ -105,9 +110,10 @@ def configure_path(scripts: Path) -> None:
 def main() -> None:
     python = get_base_python()
     scripts = get_user_scripts(python)
+    source = Path(__file__).resolve().parent
 
     print(f"Installing CodeAmil for the current user using {python}...")
-    install_codeamil(python, scripts)
+    install_codeamil(python, scripts, source=source)
     configure_path(scripts)
 
     print(f"Installation finished. Command directory: {scripts}")

@@ -1,127 +1,209 @@
 # CodeAmil
 
-CodeAmil is a Python-based AI coding agent that can inspect, modify, review, and verify code in your current project directory.
+CodeAmil is a local Python coding agent for inspecting, changing, reviewing,
+debugging, and verifying real projects. It uses the directory from which
+`codeamil` is started as the workspace, so it can be used from any project
+directory on Windows, macOS, or Linux.
 
-## Features
+## What it does
 
+- Inspects project files and searches source text before acting.
+- Plans multi-step work through a bounded model/tool loop.
+- Creates and edits files through workspace-restricted tools.
+- Runs project commands with `shell=False` and approval by default.
+- Requires approval before model-proposed file changes by default.
+- Reviews files and can propose approval-gated fixes.
+- Runs deterministic Python syntax checks.
 - Supports Gemini, OpenAI, and OpenRouter.
-- Reads and edits project files using registered tools.
-- Reviews code and proposes fixes.
-- Runs supported verification checks.
-- Requires approval for commands that need approval by default.
-- Uses the current working directory as the project workspace.
+- Reports failed tools, provider errors, iteration limits, and verification
+  results instead of claiming success.
+
+CodeAmil is an assistant, not a complete operating-system sandbox. Approved
+commands run with the permissions of your user account.
 
 ## Requirements
 
-- Python 3.10 or newer.
-- Git.
-- An API key for your selected model provider.
+- Python 3.10 or newer
+- pip
+- An API key for the selected provider
 
 ## Installation
 
-### Requirements
-- Python 3.10 or newer
-- pip
+### Windows user installation
 
-### Windows, macOS, and Linux
+Clone the repository and run the installer from PowerShell:
 
-Clone the repository and run the installer:
+```powershell
+git clone https://github.com/emad313/codeamil.git
+Set-Location codeamil
+py install.py
+```
+
+The installer installs the checked-out project for the current user and adds
+the user Scripts directory to PATH. Restart PowerShell after it finishes, then
+verify:
+
+```powershell
+codeamil --version
+```
+
+For development, use an editable install instead:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+```
+
+If PowerShell blocks activation, run the commands through the venv directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\codeamil.exe --version
+```
+
+### macOS and Linux
 
 ```bash
 git clone https://github.com/emad313/codeamil.git
 cd codeamil
-python install.py
+python3 install.py
 ```
-
-The installer installs CodeAmil for the current user and configures the command-line path where supported. Restart your terminal after installation.
-
-Verify the installation:
-
-```bash
-codeamil --version
-```
-
-### Configure CodeAmil
-
-Run the configuration command to set your AI provider, model, and API key:
-
-```bash
-codeamil config
-```
-
-### Use CodeAmil in any project
-
-Navigate to the project directory you want CodeAmil to work in, then run:
-
-```bash
-cd /path/to/your/project
-codeamil
-```
-
-CodeAmil uses your current working directory as the workspace.
 
 ## Configuration
 
-Run the interactive configuration command:
+Run the interactive setup:
 
-```bash
+```text
 codeamil config
 ```
 
-Choose your provider and model, then enter your API key. Configuration is saved in `~/.codeamil/.env` under your user home directory.
+It writes user settings to `~/.codeamil/.env`. A project `.env` in the current
+workspace can override user settings, while already-exported environment
+variables take precedence over both.
 
-You can also configure a project-specific `.env` file. Never commit API keys or other secrets.
+Supported providers and typical settings:
+
+| Provider | `MODEL_PROVIDER` | API key | Example model |
+| --- | --- | --- | --- |
+| Google Gemini | `gemini` | `GEMINI_API_KEY` | `gemini-3.6-flash` |
+| OpenAI | `openai` | `OPENAI_API_KEY` | `gpt-4.1-mini` |
+| OpenRouter | `openrouter` | `OPENROUTER_API_KEY` | `openrouter/free` |
+
+You can copy [.env.example](./.env.example) to a project `.env`, but never
+commit API keys. Relevant controls are:
+
+```dotenv
+MAX_AGENT_ITERATIONS=12
+MAX_REVIEW_FIX_CYCLES=3
+REQUIRE_APPROVAL_FOR_COMMANDS=true
+REQUIRE_APPROVAL_FOR_FILE_CHANGES=true
+REVIEW_FIX_MIN_SEVERITY=high
+```
+
+The approval settings accept `true`, `false`, `1`, `0`, `yes`, `no`, `on`, or
+`off`. File-change approval should remain enabled unless the workspace is
+already protected by another review workflow.
 
 ## Usage
 
-Navigate to any project directory before running CodeAmil:
+Always start CodeAmil from the project it should work on:
 
-```bash
-cd /path/to/your-project
-codeamil "Explain this project's structure"
-codeamil "Fix the bug in the login flow"
-codeamil "Add user authentication"
+```powershell
+Set-Location C:\path\to\project
+codeamil "Fix the login bug and run the relevant tests"
 ```
 
-CodeAmil uses the current working directory as its workspace.
+Without a task argument, CodeAmil prompts for one:
 
-## Review and Fix
+```text
+codeamil
+```
 
-Review selected files and propose fixes:
+The agent can inspect files, search text, write approved changes, and run
+approved commands. It stops at `MAX_AGENT_ITERATIONS` to prevent infinite
+model/tool loops.
 
-```bash
+## Review and verification commands
+
+Review files without changing them:
+
+```text
+codeamil --review app/main.py app/config.py
+```
+
+Run Python syntax checks:
+
+```text
+codeamil --qa app/main.py app/config.py
+```
+
+Review selected files and propose fixes. Each proposed replacement is shown as
+a diff and requires approval:
+
+```text
 codeamil --review-fix app/main.py app/config.py
 ```
 
-Review proposed changes carefully before approving them.
+Useful commands:
 
-## Useful Commands
-
-```bash
+```text
 codeamil --help
 codeamil --version
 codeamil config
 ```
 
-## Development Installation
+## Workspace and safety limitations
 
-Clone the repository and install it in editable mode:
+- Tool paths must remain inside the selected workspace.
+- Ignored directories include `.git`, virtual environments, `node_modules`,
+  caches, and Python bytecode caches.
+- Symlink traversal is skipped during listing and search.
+- Commands are executed without a shell. Shell launchers such as `cmd`,
+  PowerShell, `bash`, and `sh` are blocked.
+- Read-only Git commands do not require approval; other commands do.
+- File changes and review-fix changes are approval-gated by default.
+- CodeAmil does not automatically infer every framework's test command.
+  Ask it to inspect the project and run the relevant command, or run the
+  project's normal checks yourself after reviewing its diff.
 
-```bash
-git clone https://github.com/emad313/codeamil.git
-cd codeamil
-python -m venv .venv
-python -m pip install -e .
+## Troubleshooting
+
+### `Configuration error: MODEL_ID must be configured`
+
+Run `codeamil config`, or set `MODEL_PROVIDER`, `MODEL_ID`, and the matching
+API key in the environment.
+
+### `Missing API key`
+
+Confirm that the key name matches the selected provider. Environment variables
+are not printed by CodeAmil.
+
+### `codeamil` is not recognized on Windows
+
+Restart the terminal after `install.py` updates PATH. If it still is not
+available, use the Scripts path printed by the installer or install into an
+activated virtual environment with `python -m pip install -e .`.
+
+### The agent stops at an iteration limit
+
+The model did not produce a final answer before the configured limit. Inspect
+the tool results, increase `MAX_AGENT_ITERATIONS` modestly if appropriate, or
+split the task into smaller requests.
+
+### A command or file change was not executed
+
+CodeAmil requires explicit approval by default. Re-run the task and approve
+only commands and diffs you understand, or review
+`REQUIRE_APPROVAL_FOR_COMMANDS` and `REQUIRE_APPROVAL_FOR_FILE_CHANGES`.
+
+## Development checks
+
+From the repository root:
+
+```powershell
+python -m compileall -q app tests
+python -m pytest -q
 ```
 
-Activate the virtual environment before running development commands.
-
-## Security
-
-CodeAmil is a local coding agent, not a security sandbox. Commands you approve execute with the permissions of your operating-system account. Review commands and proposed file changes before approving them.
-
-Keep API keys private, never commit `.env` files, and use version control to protect your work.
-
-## License
-
-See the repository's license file for licensing terms.
+The test suite uses temporary workspaces and does not require an API call.

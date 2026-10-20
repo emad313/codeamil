@@ -39,6 +39,13 @@ def main() -> None:
                 "Workspace protection failed."
             )
 
+        try:
+            fs.list_files(max_files=0)
+        except ValueError:
+            print("PASS: invalid file limits are rejected")
+        else:
+            raise AssertionError("Invalid file limit was accepted")
+
         print("\nAll filesystem tests passed.")
 
 

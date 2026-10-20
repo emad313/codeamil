@@ -80,6 +80,30 @@ def test_command_approval_is_case_insensitive():
     print("PASS: command approval setting accepts normalized true")
 
 
+def test_file_change_approval_defaults_to_enabled():
+    settings = load_with_env()
+    assert settings.require_approval_for_file_changes is True
+    print("PASS: file change approval defaults to enabled")
+
+
+def test_invalid_command_approval_rejected():
+    try:
+        load_with_env(REQUIRE_APPROVAL_FOR_COMMANDS="sometimes")
+    except ValueError as exc:
+        assert "REQUIRE_APPROVAL_FOR_COMMANDS" in str(exc)
+    else:
+        raise AssertionError("Invalid command approval was accepted")
+
+
+def test_invalid_file_change_approval_rejected():
+    try:
+        load_with_env(REQUIRE_APPROVAL_FOR_FILE_CHANGES="sometimes")
+    except ValueError as exc:
+        assert "REQUIRE_APPROVAL_FOR_FILE_CHANGES" in str(exc)
+    else:
+        raise AssertionError("Invalid file approval was accepted")
+
+
 
 if __name__ == "__main__":
     test_default_severity_is_high()
@@ -90,4 +114,7 @@ if __name__ == "__main__":
     test_command_approval_defaults_to_enabled()
     test_command_approval_can_be_disabled()
     test_command_approval_is_case_insensitive()
+    test_file_change_approval_defaults_to_enabled()
+    test_invalid_command_approval_rejected()
+    test_invalid_file_change_approval_rejected()
     print("All configuration tests passed.")

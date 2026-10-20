@@ -64,6 +64,7 @@ def configure_user_settings() -> None:
     existing.setdefault("MAX_AGENT_ITERATIONS", "12")
     existing.setdefault("MAX_REVIEW_FIX_CYCLES", "3")
     existing.setdefault("REQUIRE_APPROVAL_FOR_COMMANDS", "true")
+    existing.setdefault("REQUIRE_APPROVAL_FOR_FILE_CHANGES", "true")
     existing.setdefault("REVIEW_FIX_MIN_SEVERITY", "high")
 
     config_path.write_text(
@@ -104,6 +105,18 @@ def main() -> None:
         metavar="FILE",
         help="Review selected files and propose or apply approved fixes",
     )
+    parser.add_argument(
+        "--review",
+        nargs="+",
+        metavar="FILE",
+        help="Review selected files without modifying them",
+    )
+    parser.add_argument(
+        "--qa",
+        nargs="+",
+        metavar="FILE",
+        help="Run Python syntax checks on selected files",
+    )
 
     args = parser.parse_args()
 
@@ -118,6 +131,44 @@ def main() -> None:
         parser.exit(1, f"Configuration error: {exc}\n")
 
     orchestrator = Orchestrator(settings)
+
+    if args.review:
+        try:
+            report = orchestrator.review_files(args.review)
+        except (ValueError, OSError) as exc:
+            parser.exit(1, f"Review error: {exc}\n")
+
+        print(f"Workspace: {orchestrator.workspace}")
+        print(f"Summary: {report.summary}")
+        for finding in report.findings:
+            location = (
+                f" ({finding.file}:{finding.line})"
+                if finding.file and finding.line
+                else f" ({finding.file})"
+                if finding.file
+                else ""
+            )
+            print(
+                f"- [{finding.severity.upper()}] "
+                f"{finding.category}{location}: {finding.message}"
+            )
+        if not report.passed:
+            raise SystemExit(1)
+        return
+
+    if args.qa:
+        try:
+            report = orchestrator.run_qa(args.qa)
+        except (ValueError, OSError) as exc:
+            parser.exit(1, f"QA error: {exc}\n")
+
+        for check in report.checks:
+            status = "PASS" if check.passed else "FAIL"
+            detail = check.error or check.output
+            print(f"[{status}] {check.name}" + (f": {detail}" if detail else ""))
+        if not report.passed:
+            raise SystemExit(1)
+        return
 
     if args.review_fix:
         print(f"Workspace: {orchestrator.workspace}")
@@ -226,11 +277,50 @@ def main() -> None:
         answer = input("Execute this command? [y/N]: ").strip().lower()
         return answer == "y"
 
+    def approve_file_change(
+        relative_path: str,
+        content: str,
+        explanation: str,
+    ) -> bool:
+        target = (orchestrator.workspace / relative_path).resolve()
+        if not target.is_relative_to(orchestrator.workspace):
+            print("File change rejected: path is outside the workspace.")
+            return False
 
-    state = orchestrator.run_task(
-        task,
-        approve_command=approve_command,
-    )
+        try:
+            original = target.read_text(encoding="utf-8") if target.is_file() else ""
+        except (OSError, UnicodeError) as exc:
+            print(f"Could not preview the file change: {exc}")
+            return False
+
+        preview = "".join(
+            difflib.unified_diff(
+                original.splitlines(keepends=True),
+                content.splitlines(keepends=True),
+                fromfile=f"a/{relative_path}",
+                tofile=f"b/{relative_path}",
+            )
+        )
+
+        if not preview:
+            print(f"No content differences detected for {relative_path}.")
+            return False
+
+        print(f"\nProposed file change: {relative_path}")
+        print(f"Explanation: {explanation}")
+        print("\n--- Proposed Diff ---")
+        print(preview, end="" if preview.endswith("\n") else "\n")
+        print("--- End Diff ---")
+        return input("Apply this change? [y/N]: ").strip().lower() == "y"
+
+    try:
+        state = orchestrator.run_task(
+            task,
+            approve_command=approve_command,
+            approve_file_change=approve_file_change,
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        parser.exit(1, f"Task error: {exc}\n")
 
     print(f"\nStatus: {state.status}")
     print(f"Iterations: {state.iteration}")
@@ -241,6 +331,9 @@ def main() -> None:
 
     if state.error:
         print(f"\nError: {state.error}")
+
+    if state.status not in {"completed"}:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
