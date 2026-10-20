@@ -62,7 +62,7 @@ class CommandPolicy:
                 reason="Every command argument must be a non-empty string.",
             )
 
-        executable = Path(command[0]).name.lower()
+        executable = command[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
 
         if executable in self.SHELL_EXECUTABLES:
             return CommandDecision(

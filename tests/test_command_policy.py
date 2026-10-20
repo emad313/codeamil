@@ -45,6 +45,22 @@ def test_shell_execution_is_blocked():
     print("PASS: shell launch attempts are blocked")
 
 
+def test_shell_paths_are_blocked():
+    policy = CommandPolicy()
+
+    for command in (
+        ["/bin/bash", "-c", "echo unsafe"],
+        [r"C:\Windows\System32\cmd.exe", "/c", "echo unsafe"],
+        [r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+         "-Command", "Write-Output unsafe"],
+    ):
+        decision = policy.evaluate(command, Path.cwd())
+
+        assert not decision.allowed
+        assert not decision.requires_approval
+
+    print("PASS: shell executable paths are blocked")
+
 def test_invalid_commands_are_rejected():
     policy = CommandPolicy()
 
@@ -72,6 +88,7 @@ if __name__ == "__main__":
     test_read_only_command_needs_no_approval()
     test_unknown_command_requires_approval()
     test_shell_execution_is_blocked()
+    test_shell_paths_are_blocked()
     test_invalid_commands_are_rejected()
     test_read_only_classification_requires_exact_match()
     print("All command policy tests passed.")
