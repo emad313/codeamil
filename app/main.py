@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
+from app.agents.qa import QAAgent
 from app.config import load_settings, validate_active_provider
 from app.orchestrator import Orchestrator
 from app.terminal import TerminalAnimation
@@ -125,6 +126,22 @@ def main() -> None:
         configure_user_settings()
         return
 
+    if args.qa:
+        animation = TerminalAnimation()
+        try:
+            with animation:
+                report = QAAgent(Path.cwd()).run_checks(args.qa)
+        except (ValueError, OSError) as exc:
+            parser.exit(1, f"QA error: {exc}\n")
+
+        for check in report.checks:
+            status = "PASS" if check.passed else "FAIL"
+            detail = check.error or check.output
+            print(f"[{status}] {check.name}" + (f": {detail}" if detail else ""))
+        if not report.passed:
+            raise SystemExit(1)
+        return
+
     try:
         settings = load_settings()
         validate_active_provider(settings)
@@ -155,21 +172,6 @@ def main() -> None:
                 f"- [{finding.severity.upper()}] "
                 f"{finding.category}{location}: {finding.message}"
             )
-        if not report.passed:
-            raise SystemExit(1)
-        return
-
-    if args.qa:
-        try:
-            with animation:
-                report = orchestrator.run_qa(args.qa)
-        except (ValueError, OSError) as exc:
-            parser.exit(1, f"QA error: {exc}\n")
-
-        for check in report.checks:
-            status = "PASS" if check.passed else "FAIL"
-            detail = check.error or check.output
-            print(f"[{status}] {check.name}" + (f": {detail}" if detail else ""))
         if not report.passed:
             raise SystemExit(1)
         return

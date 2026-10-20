@@ -151,6 +151,8 @@ Run Python syntax checks:
 codeamil --qa app/main.py app/config.py
 ```
 
+QA is deterministic and does not require a configured provider or API key.
+
 Review selected files and propose fixes. Each proposed replacement is shown as
 a diff and requires approval:
 

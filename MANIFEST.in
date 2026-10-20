@@ -1,0 +1,12 @@
+include README.md
+include pyproject.toml
+prune tests
+prune .git
+prune .venv
+prune .pytest_cache
+prune __pycache__
+prune workspaces
+prune reports
+exclude .env
+exclude .env.*
+global-exclude *.py[cod]
