@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 workspaces/
 reports/
+*.egg-info/
+dist/
+build/

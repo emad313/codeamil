@@ -1,14 +1,97 @@
-
 import argparse
 import difflib
+import getpass
+import json
+import os
+from pathlib import Path
+
+from dotenv import dotenv_values
 
 from app.config import load_settings, validate_active_provider
 from app.orchestrator import Orchestrator
 
 
+
+def configure_user_settings() -> None:
+    """Interactively configure CodeAmil for the current user."""
+    config_path = Path.home() / ".codeamil" / ".env"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    existing = {
+        key: value
+        for key, value in dotenv_values(config_path).items()
+        if value is not None
+    }
+
+    print("Configure CodeAmil")
+    print(f"Settings file: {config_path}")
+    print("Providers: gemini, openai, openrouter")
+
+    current_provider = existing.get("MODEL_PROVIDER", "gemini")
+    provider = input(
+        f"Provider [{current_provider}]: "
+    ).strip().lower() or current_provider
+
+    if provider not in {"gemini", "openai", "openrouter"}:
+        print("Unsupported provider. Choose gemini, openai, or openrouter.")
+        return
+
+    default_models = {
+        "gemini": "gemini-3.6-flash",
+        "openai": "gpt-4.1-mini",
+        "openrouter": "openrouter/free",
+    }
+
+    current_model = existing.get("MODEL_ID", default_models[provider])
+    model = input(f"Model ID [{current_model}]: ").strip() or current_model
+
+    key_names = {
+        "gemini": "GEMINI_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "openrouter": "OPENROUTER_API_KEY",
+    }
+    selected_key = key_names[provider]
+
+    print(f"Enter the API key for {provider}. Leave blank to keep the saved key.")
+    api_key = getpass.getpass("API key: ").strip()
+
+    existing["MODEL_PROVIDER"] = provider
+    existing["MODEL_ID"] = model
+
+    if api_key:
+        existing[selected_key] = api_key
+
+    existing.setdefault("MAX_AGENT_ITERATIONS", "12")
+    existing.setdefault("MAX_REVIEW_FIX_CYCLES", "3")
+    existing.setdefault("REQUIRE_APPROVAL_FOR_COMMANDS", "true")
+    existing.setdefault("REVIEW_FIX_MIN_SEVERITY", "high")
+
+    config_path.write_text(
+        "".join(
+            f"{key}={json.dumps(value)}\n"
+            for key, value in existing.items()
+        ),
+        encoding="utf-8",
+    )
+
+    if os.name != "nt":
+        config_path.chmod(0o600)
+
+    if not existing.get(selected_key):
+        print(f"Configuration saved, but {selected_key} is still missing.")
+        return
+
+    print("Configuration saved successfully.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="CodeAmil Agent - General-Purpose AI Coding Agent"
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version="CodeAmil 0.1.0",
     )
     parser.add_argument(
         "task",
@@ -23,6 +106,10 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.task == "config" and not args.review_fix:
+        configure_user_settings()
+        return
 
     try:
         settings = load_settings()

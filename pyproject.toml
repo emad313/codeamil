@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codeamil"
+version = "0.1.0"
+description = "An AI coding agent for working across project directories"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openai",
+    "google-genai",
+    "python-dotenv",
+]
+
+[project.scripts]
+codeamil = "app.main:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
