@@ -1,7 +1,8 @@
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+
+from app.tools.execution import CommandExecutor
 from app.tools.filesystem import WorkspaceFileSystem
 
 
@@ -35,7 +36,7 @@ class ToolRegistry:
         )
 
     def list_tools(self) -> list[dict[str, Any]]:
-        """Return tool definitions for future model integration."""
+        """Return registered tool definitions."""
         return [
             {
                 "name": tool.name,
@@ -83,6 +84,10 @@ class ToolRegistry:
 
         try:
             result = tool.handler(**arguments)
+
+            if name == "run_command" and isinstance(result, dict):
+                return result
+
             return {
                 "ok": True,
                 "result": result,
@@ -93,9 +98,12 @@ class ToolRegistry:
                 "error": f"{type(exc).__name__}: {exc}",
             }
 
+
 def create_filesystem_registry(
     workspace: str | Path,
+    command_executor: CommandExecutor | None = None,
 ) -> ToolRegistry:
+    """Create the filesystem registry with optional command execution."""
     fs = WorkspaceFileSystem(workspace)
     registry = ToolRegistry()
 
@@ -158,5 +166,26 @@ def create_filesystem_registry(
         },
         handler=fs.write_file,
     )
+
+    if command_executor is not None:
+        registry.register(
+            name="run_command",
+            description=(
+                "Execute a command in the project workspace. "
+                "Commands may require explicit user approval."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": ["command"],
+                "additionalProperties": False,
+            },
+            handler=lambda command: command_executor.execute(command),
+        )
 
     return registry

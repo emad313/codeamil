@@ -132,7 +132,18 @@ def main() -> None:
     if not task:
         parser.error("A task is required.")
 
-    state = orchestrator.run_task(task)
+    def approve_command(command: list[str]) -> bool:
+        print("\nCommand requires your approval:")
+        print(f"  {' '.join(command)}")
+
+        answer = input("Execute this command? [y/N]: ").strip().lower()
+        return answer == "y"
+
+
+    state = orchestrator.run_task(
+        task,
+        approve_command=approve_command,
+    )
 
     print(f"\nStatus: {state.status}")
     print(f"Iterations: {state.iteration}")

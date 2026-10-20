@@ -12,6 +12,7 @@ from app.config import Settings
 from app.model_router import ModelRouter
 from app.task_state import TaskState
 from app.tools.registry import create_filesystem_registry
+from app.tools.execution import CommandExecutor
 
 
 class Orchestrator:
@@ -28,7 +29,12 @@ class Orchestrator:
             workspace if workspace is not None else Path.cwd()
         ).resolve()
 
-        self.registry = create_filesystem_registry(self.workspace)
+        self.command_executor = CommandExecutor(self.workspace)
+
+        self.registry = create_filesystem_registry(
+            self.workspace,
+            command_executor=self.command_executor,
+        )
 
     def _build_system_prompt(self) -> str:
         tools_json = json.dumps(
@@ -37,7 +43,7 @@ class Orchestrator:
         )
 
         return f"""
-You are Forge Agent, a general-purpose AI coding agent.
+You are CodeAmil Agent, a general-purpose AI coding agent.
 
 You are working in this project directory:
 {self.workspace}
@@ -124,7 +130,11 @@ Rules:
             approve_change=approve_change,
         )
 
-    def run_task(self, task: str) -> TaskState:
+    def run_task(
+        self,
+        task: str,
+        approve_command: Callable[[list[str]], bool] | None = None,
+    ) -> TaskState:
         """Execute a general-purpose agent task."""
         state = TaskState(task=task, status="running")
 
@@ -180,10 +190,44 @@ Rules:
                     state.status = "completed"
                     return state
 
-                tool_result = self.registry.execute(
-                    action.name,
-                    action.arguments or {},
-                )
+                tool_arguments = action.arguments or {}
+
+                if action.name == "run_command":
+                    if (
+                        not isinstance(tool_arguments, dict)
+                        or set(tool_arguments) != {"command"}
+                    ):
+                        tool_result = {
+                            "ok": False,
+                            "error": "run_command requires exactly one argument: command.",
+                        }
+                    else:
+                        command = tool_arguments["command"]
+
+                        if (
+                            not isinstance(command, list)
+                            or not command
+                            or not all(
+                                isinstance(arg, str) and arg.strip()
+                                for arg in command
+                            )
+                        ):
+                            tool_result = {
+                                "ok": False,
+                                "error": "command must be a non-empty list of non-empty strings.",
+                            }
+                        else:
+                            approval_callback = approve_command
+
+                            tool_result = self.command_executor.execute(
+                                command,
+                                approve=approval_callback,
+                            )
+                else:
+                    tool_result = self.registry.execute(
+                        action.name,
+                        tool_arguments,
+                    )
 
                 state.messages.append({
                     "role": "user",
