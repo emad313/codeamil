@@ -138,7 +138,7 @@ def main() -> None:
         try:
             with animation:
                 report = orchestrator.review_files(args.review)
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, RuntimeError) as exc:
             parser.exit(1, f"Review error: {exc}\n")
 
         print(f"Workspace: {orchestrator.workspace}")
@@ -230,7 +230,7 @@ def main() -> None:
                     args.review_fix,
                     approve_change=approve_change,
                 )
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, RuntimeError) as exc:
             parser.exit(1, f"Review-fix error: {exc}\n")
 
         print(f"\nStatus: {report.status}")

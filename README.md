@@ -21,6 +21,7 @@ and pauses while CodeAmil waits for command or file-change approval.
 - Supports Gemini, OpenAI, and OpenRouter.
 - Reports failed tools, provider errors, iteration limits, and verification
   results instead of claiming success.
+- Redacts configured provider keys from surfaced provider errors.
 
 CodeAmil is an assistant, not a complete operating-system sandbox. Approved
 commands run with the permissions of your user account.
@@ -126,7 +127,15 @@ codeamil
 
 The agent can inspect files, search text, write approved changes, and run
 approved commands. It stops at `MAX_AGENT_ITERATIONS` to prevent infinite
-model/tool loops.
+model/tool loops. It exits with a non-zero status when the task fails or
+reaches the iteration limit.
+
+The agent has two search tools:
+
+- `search_text` finds case-insensitive text matches and reports file, line, and
+  matching text.
+- `search_files` finds files by name or relative path pattern, such as
+  `*.py` or `src/*.py`.
 
 ## Review and verification commands
 
@@ -200,6 +209,20 @@ split the task into smaller requests.
 CodeAmil requires explicit approval by default. Re-run the task and approve
 only commands and diffs you understand, or review
 `REQUIRE_APPROVAL_FOR_COMMANDS` and `REQUIRE_APPROVAL_FOR_FILE_CHANGES`.
+
+### Provider requests are slow or temporarily fail
+
+Provider requests use bounded retries for common rate-limit, timeout, and
+temporary server errors. After the retry limit, CodeAmil reports a failure and
+does not claim that the task completed. Check the provider, model ID, API key,
+and network connection before retrying.
+
+### Review or QA exits with an error
+
+Review and QA commands return a non-zero exit status when a file is missing,
+outside the workspace, a provider request fails, or a verification check
+fails. The error is printed to the terminal; no changes are applied by the
+read-only review or QA commands.
 
 ## Development checks
 
