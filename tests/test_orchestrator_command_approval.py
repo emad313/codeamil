@@ -12,12 +12,20 @@ from unittest.mock import patch
 
 
 def load_settings_with_approval(enabled: bool):
+    home = Path(os.environ.get("USERPROFILE", r"C:\Users\emad"))
+
     env = {
+        "HOME": str(home),
+        "USERPROFILE": str(home),
         "MODEL_PROVIDER": "gemini",
         "MODEL_ID": "test-model",
         "REQUIRE_APPROVAL_FOR_COMMANDS": str(enabled).lower(),
     }
-    with patch.dict(os.environ, env, clear=True):
+
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch("pathlib.Path.home", return_value=home),
+    ):
         return load_settings()
 
 
