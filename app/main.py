@@ -9,6 +9,7 @@ from dotenv import dotenv_values
 
 from app.config import load_settings, validate_active_provider
 from app.orchestrator import Orchestrator
+from app.terminal import TerminalAnimation
 
 
 
@@ -131,10 +132,12 @@ def main() -> None:
         parser.exit(1, f"Configuration error: {exc}\n")
 
     orchestrator = Orchestrator(settings)
+    animation = TerminalAnimation()
 
     if args.review:
         try:
-            report = orchestrator.review_files(args.review)
+            with animation:
+                report = orchestrator.review_files(args.review)
         except (ValueError, OSError) as exc:
             parser.exit(1, f"Review error: {exc}\n")
 
@@ -158,7 +161,8 @@ def main() -> None:
 
     if args.qa:
         try:
-            report = orchestrator.run_qa(args.qa)
+            with animation:
+                report = orchestrator.run_qa(args.qa)
         except (ValueError, OSError) as exc:
             parser.exit(1, f"QA error: {exc}\n")
 
@@ -177,6 +181,7 @@ def main() -> None:
             print(f"  - {file_path}")
 
         def approve_change(change) -> bool:
+            animation.pause()
             print(f"\nProposed change: {change.file}")
             print(f"Explanation: {change.explanation}")
 
@@ -186,6 +191,7 @@ def main() -> None:
                 ).read_text(encoding="utf-8")
             except (OSError, UnicodeError) as exc:
                 print(f"Could not preview the change: {exc}")
+                animation.resume()
                 return False
 
             diff = difflib.unified_diff(
@@ -199,6 +205,7 @@ def main() -> None:
 
             if not preview:
                 print("No content differences detected.")
+                animation.resume()
                 return False
 
             print("\n--- Proposed Diff ---")
@@ -208,17 +215,21 @@ def main() -> None:
             )
             print("--- End Diff ---")
 
-            answer = input(
-                "\nApply this change? [y/N]: "
-            ).strip().lower()
+            try:
+                answer = input(
+                    "\nApply this change? [y/N]: "
+                ).strip().lower()
+            finally:
+                animation.resume()
 
             return answer == "y"
 
         try:
-            report = orchestrator.run_review_fix(
-                args.review_fix,
-                approve_change=approve_change,
-            )
+            with animation:
+                report = orchestrator.run_review_fix(
+                    args.review_fix,
+                    approve_change=approve_change,
+                )
         except (ValueError, OSError) as exc:
             parser.exit(1, f"Review-fix error: {exc}\n")
 
@@ -271,10 +282,14 @@ def main() -> None:
         parser.error("A task is required.")
 
     def approve_command(command: list[str]) -> bool:
+        animation.pause()
         print("\nCommand requires your approval:")
         print(f"  {' '.join(command)}")
 
-        answer = input("Execute this command? [y/N]: ").strip().lower()
+        try:
+            answer = input("Execute this command? [y/N]: ").strip().lower()
+        finally:
+            animation.resume()
         return answer == "y"
 
     def approve_file_change(
@@ -282,15 +297,18 @@ def main() -> None:
         content: str,
         explanation: str,
     ) -> bool:
+        animation.pause()
         target = (orchestrator.workspace / relative_path).resolve()
         if not target.is_relative_to(orchestrator.workspace):
             print("File change rejected: path is outside the workspace.")
+            animation.resume()
             return False
 
         try:
             original = target.read_text(encoding="utf-8") if target.is_file() else ""
         except (OSError, UnicodeError) as exc:
             print(f"Could not preview the file change: {exc}")
+            animation.resume()
             return False
 
         preview = "".join(
@@ -304,6 +322,7 @@ def main() -> None:
 
         if not preview:
             print(f"No content differences detected for {relative_path}.")
+            animation.resume()
             return False
 
         print(f"\nProposed file change: {relative_path}")
@@ -311,14 +330,19 @@ def main() -> None:
         print("\n--- Proposed Diff ---")
         print(preview, end="" if preview.endswith("\n") else "\n")
         print("--- End Diff ---")
-        return input("Apply this change? [y/N]: ").strip().lower() == "y"
+        try:
+            answer = input("Apply this change? [y/N]: ").strip().lower()
+        finally:
+            animation.resume()
+        return answer == "y"
 
     try:
-        state = orchestrator.run_task(
-            task,
-            approve_command=approve_command,
-            approve_file_change=approve_file_change,
-        )
+        with animation:
+            state = orchestrator.run_task(
+                task,
+                approve_command=approve_command,
+                approve_file_change=approve_file_change,
+            )
     except (OSError, ValueError, RuntimeError) as exc:
         parser.exit(1, f"Task error: {exc}\n")
 

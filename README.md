@@ -5,6 +5,10 @@ debugging, and verifying real projects. It uses the directory from which
 `codeamil` is started as the workspace, so it can be used from any project
 directory on Windows, macOS, or Linux.
 
+During model work and verification, an interactive terminal shows a small
+spinner. It is disabled automatically when output is redirected or captured,
+and pauses while CodeAmil waits for command or file-change approval.
+
 ## What it does
 
 - Inspects project files and searches source text before acting.

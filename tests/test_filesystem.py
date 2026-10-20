@@ -27,6 +27,9 @@ def main() -> None:
         # Search source code.
         print("\n--- Search Results ---")
         print(fs.search_text("greet"))
+        assert fs.search.files("*.py") == ["src/example.py"]
+        assert fs.search.files("src/*.py") == ["src/example.py"]
+        print("PASS: file pattern search finds matching files")
 
         # Verify workspace protection.
         print("\n--- Security Test ---")

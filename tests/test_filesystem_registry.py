@@ -32,6 +32,14 @@ def main() -> None:
             )
         )
 
+        print("\nSearch files:")
+        result = registry.execute(
+            "search_files",
+            {"pattern": "*.py"},
+        )
+        print(result)
+        assert result == {"ok": True, "result": ["src/app.py"]}
+
         print("\nAll registry integration tests completed.")
 
 
