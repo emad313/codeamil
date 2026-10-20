@@ -19,13 +19,46 @@ CodeAmil is a Python-based AI coding agent that can inspect, modify, review, and
 
 ## Installation
 
-Install directly from GitHub:
+### Requirements
+- Python 3.10 or newer
+- pip
+
+### Windows, macOS, and Linux
+
+Clone the repository and run the installer:
 
 ```bash
-python -m pip install git+https://github.com/emad313/codeamil.git
+git clone https://github.com/emad313/codeamil.git
+cd codeamil
+python install.py
 ```
 
-If the `codeamil` command is not found on Windows, ensure your Python Scripts directory is on PATH and reopen your terminal.
+The installer installs CodeAmil for the current user and configures the command-line path where supported. Restart your terminal after installation.
+
+Verify the installation:
+
+```bash
+codeamil --version
+```
+
+### Configure CodeAmil
+
+Run the configuration command to set your AI provider, model, and API key:
+
+```bash
+codeamil config
+```
+
+### Use CodeAmil in any project
+
+Navigate to the project directory you want CodeAmil to work in, then run:
+
+```bash
+cd /path/to/your/project
+codeamil
+```
+
+CodeAmil uses your current working directory as the workspace.
 
 ## Configuration
 
