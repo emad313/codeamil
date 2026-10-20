@@ -82,9 +82,7 @@ class ReviewFixLoop:
                 )
 
             if not resolved.is_file():
-                raise ValueError(
-                    f"File does not exist: {relative_path}"
-                )
+                raise ValueError(f"File does not exist: {relative_path}")
 
             validated.append(
                 resolved.relative_to(self.workspace).as_posix()
@@ -119,10 +117,7 @@ class ReviewFixLoop:
                 f"Could not write {relative_path}: {result['error']}"
             )
 
-    def _actionable_findings(
-        self,
-        review: ReviewReport,
-    ):
+    def _actionable_findings(self, review: ReviewReport):
         actionable = []
 
         for finding in review.findings:
@@ -145,8 +140,7 @@ class ReviewFixLoop:
         selected = self._validate_files(relative_paths)
 
         python_files = [
-            path
-            for path in selected
+            path for path in selected
             if Path(path).suffix.lower() == ".py"
         ]
 
@@ -177,9 +171,7 @@ class ReviewFixLoop:
                 )
             else:
                 latest_qa_passed = True
-                messages.append(
-                    "QA skipped: no selected Python files."
-                )
+                messages.append("QA skipped: no selected Python files.")
 
             if not actionable_findings and latest_qa_passed:
                 return ReviewFixReport(
@@ -198,8 +190,7 @@ class ReviewFixLoop:
 
             for path in selected:
                 matching = [
-                    finding
-                    for finding in actionable_findings
+                    finding for finding in actionable_findings
                     if not finding.file or finding.file == path
                 ]
 
@@ -244,10 +235,7 @@ class ReviewFixLoop:
             pending_changes: list[CodeChange] = []
 
             for change in proposed_changes:
-                if (
-                    approve_change is None
-                    or not approve_change(change)
-                ):
+                if approve_change is None or not approve_change(change):
                     pending_changes.append(change)
                     messages.append(
                         f"Change awaiting approval: {change.file}"
