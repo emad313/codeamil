@@ -29,7 +29,10 @@ class Orchestrator:
             workspace if workspace is not None else Path.cwd()
         ).resolve()
 
-        self.command_executor = CommandExecutor(self.workspace)
+        self.command_executor = CommandExecutor(
+            self.workspace,
+            require_approval=settings.require_approval_for_commands,
+        )
 
         self.registry = create_filesystem_registry(
             self.workspace,

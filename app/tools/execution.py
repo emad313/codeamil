@@ -15,9 +15,11 @@ class CommandExecutor:
         workspace: str | Path,
         policy: CommandPolicy | None = None,
         timeout: int = 30,
+        require_approval: bool = True,
     ) -> None:
         self.workspace = Path(workspace).resolve()
         self.policy = policy or CommandPolicy()
+        self.require_approval = require_approval
 
         if timeout < 1:
             raise ValueError("timeout must be at least 1 second.")
@@ -40,7 +42,11 @@ class CommandExecutor:
                 "error": decision.reason,
             }
 
-        if decision.requires_approval:
+        needs_approval = (
+            decision.requires_approval and self.require_approval
+        )
+
+        if needs_approval:
             if approve is None:
                 return {
                     "ok": False,

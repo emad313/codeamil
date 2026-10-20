@@ -7,25 +7,54 @@ from app.config import load_settings
 from app.orchestrator import Orchestrator
 
 
+import os
+from unittest.mock import patch
+
+
+def load_settings_with_approval(enabled: bool):
+    env = {
+        "MODEL_PROVIDER": "gemini",
+        "MODEL_ID": "test-model",
+        "REQUIRE_APPROVAL_FOR_COMMANDS": str(enabled).lower(),
+    }
+    with patch.dict(os.environ, env, clear=True):
+        return load_settings()
+
+
 def main() -> None:
     with TemporaryDirectory() as temp_dir:
         workspace = Path(temp_dir)
 
+        for approval_setting in (True, False):
+            with patch("app.orchestrator.ModelRouter"):
+                orchestrator = Orchestrator(
+                    settings=load_settings_with_approval(
+                        approval_setting
+                    ),
+                    workspace=workspace,
+                )
+
+            assert (
+                orchestrator.command_executor.require_approval
+                is approval_setting
+            )
+
+        print("PASS: orchestrator passes approval setting to executor")
+
+        # Existing approval behavior remains enabled by default.
         with patch("app.orchestrator.ModelRouter"):
             orchestrator = Orchestrator(
-                settings=load_settings(),
+                settings=load_settings_with_approval(True),
                 workspace=workspace,
             )
 
         executor = orchestrator.command_executor
 
-        # An unclassified command must not run without approval.
         result = executor.execute(["python", "--version"])
         assert result["ok"] is False
         assert "approval" in result["error"].lower()
         print("PASS: command without approval is rejected")
 
-        # A denied approval must prevent execution.
         with patch("app.tools.execution.subprocess.run") as run:
             result = executor.execute(
                 ["python", "--version"],
@@ -35,7 +64,6 @@ def main() -> None:
             run.assert_not_called()
         print("PASS: rejected approval prevents execution")
 
-        # An approved command can execute.
         with patch("app.tools.execution.subprocess.run") as run:
             run.return_value.returncode = 0
             run.return_value.stdout = "Python test\n"
@@ -50,7 +78,6 @@ def main() -> None:
             run.assert_called_once()
         print("PASS: approved command executes")
 
-        # Shell launch attempts remain blocked even if approval is granted.
         with patch("app.tools.execution.subprocess.run") as run:
             result = executor.execute(
                 ["bash", "-c", "echo unsafe"],
@@ -61,6 +88,7 @@ def main() -> None:
         print("PASS: shell launch is blocked")
 
     print("All orchestrator command approval tests passed.")
+
 
 
 if __name__ == "__main__":
