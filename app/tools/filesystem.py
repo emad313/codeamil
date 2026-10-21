@@ -1,6 +1,7 @@
 
 import os
 from pathlib import Path
+from typing import Callable
 
 from app.tools.search import WorkspaceSearch
 
@@ -17,8 +18,13 @@ class WorkspaceFileSystem:
         ".pytest_cache",
     }
 
-    def __init__(self, workspace: str | Path) -> None:
+    def __init__(
+        self,
+        workspace: str | Path,
+        write_progress: Callable[[str, str], None] | None = None,
+    ) -> None:
         self.workspace = Path(workspace).resolve()
+        self.write_progress = write_progress
 
         if not self.workspace.is_dir():
             raise ValueError(
@@ -128,6 +134,12 @@ class WorkspaceFileSystem:
 
         if path.exists() and not path.is_file():
             raise IsADirectoryError(relative_path)
+
+        if self.write_progress is not None:
+            self.write_progress(
+                path.relative_to(self.workspace).as_posix(),
+                content,
+            )
 
         path.write_text(content, encoding="utf-8")
 

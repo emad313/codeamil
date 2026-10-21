@@ -107,6 +107,10 @@ on the provider and your account.
 - File changes require explicit approval by default.
 - Commands require explicit approval by default.
 - Proposed file changes are shown as diffs before approval.
+- Approved writes show the target file and its content line by line in the
+  terminal.
+- Long-running commands show their command, live output, and completion
+  status; the agent waits for the command result before continuing.
 - Tasks report provider errors, tool failures, iteration limits, and
   verification results instead of claiming success.
 
@@ -200,16 +204,28 @@ MODEL_PROVIDER=gemini
 MODEL_ID=your-supported-model-id
 GEMINI_API_KEY=your-api-key
 
-MAX_AGENT_ITERATIONS=12
+MAX_AGENT_ITERATIONS=30
 MAX_REVIEW_FIX_CYCLES=3
+COMMAND_TIMEOUT_SECONDS=600
 REQUIRE_APPROVAL_FOR_COMMANDS=true
 REQUIRE_APPROVAL_FOR_FILE_CHANGES=true
 REVIEW_FIX_MIN_SEVERITY=high
+CODEAMIL_COLOR=always
+CODEAMIL_ANIMATION=always
 ```
 
 Use [`.env.example`](.env.example) as a reference. Never commit API keys or
 other secrets to Git. Approval settings accept `true`, `false`, `1`, `0`,
 `yes`, `no`, `on`, or `off`.
+
+`CODEAMIL_COLOR` accepts `auto`, `always`, or `never`. Colors default to
+`always`; use `auto` to follow the terminal and keep redirected output plain,
+or `never` for scripts and log files.
+
+`CODEAMIL_ANIMATION` accepts `auto`, `always`, or `never`. The working spinner
+defaults to `always` and pauses while live command output or file-write
+progress is displayed. Use `auto` for terminal-aware behavior or `never` to
+disable animation.
 
 ## CLI usage
 
@@ -242,6 +258,17 @@ codeamil --help
 codeamil --version
 codeamil config
 ```
+
+Control terminal colors per command when needed:
+
+```bash
+codeamil --color always "Explain the project structure"
+codeamil --color never --qa app/main.py
+codeamil --animation never "Run the project checks"
+```
+
+The `--color` option overrides `CODEAMIL_COLOR`, and `--animation` overrides
+`CODEAMIL_ANIMATION`.
 
 ## Review, review-fix, and QA
 
@@ -324,8 +351,13 @@ For a virtual environment:
 ### The agent reaches its iteration limit
 
 The model did not produce a final response before
-`MAX_AGENT_ITERATIONS`. Inspect the reported tool results, increase the limit
-modestly if appropriate, or split the task into smaller steps.
+`MAX_AGENT_ITERATIONS`. The default is 30, which gives multi-step project
+scaffolding more room to inspect, create, and verify files. You can increase
+the limit modestly if appropriate or split the task into smaller steps.
+
+Commands stream their output while running and have a 600-second default
+timeout. Set `COMMAND_TIMEOUT_SECONDS` in `.env` when a project setup command
+needs a different limit.
 
 ### A command or file change was not executed
 

@@ -3,6 +3,7 @@ import difflib
 import getpass
 import json
 import os
+import sys
 from pathlib import Path
 
 from dotenv import dotenv_values
@@ -63,7 +64,7 @@ def configure_user_settings() -> None:
     if api_key:
         existing[selected_key] = api_key
 
-    existing.setdefault("MAX_AGENT_ITERATIONS", "12")
+    existing.setdefault("MAX_AGENT_ITERATIONS", "30")
     existing.setdefault("MAX_REVIEW_FIX_CYCLES", "3")
     existing.setdefault("REQUIRE_APPROVAL_FOR_COMMANDS", "true")
     existing.setdefault("REQUIRE_APPROVAL_FOR_FILE_CHANGES", "true")
@@ -119,6 +120,19 @@ def main() -> None:
         metavar="FILE",
         help="Run Python syntax checks on selected files",
     )
+    parser.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        help="Control terminal colors (default: CODEAMIL_COLOR or always)",
+    )
+    parser.add_argument(
+        "--animation",
+        choices=("auto", "always", "never"),
+        help=(
+            "Control the working animation "
+            "(default: CODEAMIL_ANIMATION or always)"
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -126,8 +140,44 @@ def main() -> None:
         configure_user_settings()
         return
 
+    color_mode = (
+        args.color
+        or os.getenv("CODEAMIL_COLOR", "always").strip().lower()
+    )
+    if color_mode not in {"auto", "always", "never"}:
+        parser.exit(
+            2,
+            "Configuration error: CODEAMIL_COLOR must be auto, always, or never.\n",
+        )
+
+    color = (
+        None
+        if color_mode == "auto"
+        else color_mode == "always"
+    )
+    animation_mode = (
+        args.animation
+        or os.getenv("CODEAMIL_ANIMATION", "always").strip().lower()
+    )
+    if animation_mode not in {"auto", "always", "never"}:
+        parser.exit(
+            2,
+            (
+                "Configuration error: CODEAMIL_ANIMATION must be "
+                "auto, always, or never.\n"
+            ),
+        )
+    animation_enabled = (
+        None
+        if animation_mode == "auto"
+        else animation_mode == "always"
+    )
+
     if args.qa:
-        animation = TerminalAnimation()
+        animation = TerminalAnimation(
+            color=color,
+            enabled=animation_enabled,
+        )
         try:
             with animation:
                 report = QAAgent(Path.cwd()).run_checks(args.qa)
@@ -137,7 +187,13 @@ def main() -> None:
         for check in report.checks:
             status = "PASS" if check.passed else "FAIL"
             detail = check.error or check.output
-            print(f"[{status}] {check.name}" + (f": {detail}" if detail else ""))
+            status_color = "green" if check.passed else "red"
+            label = (
+                animation.paint(f"[{status}]", status_color)
+                if sys.stdout.isatty()
+                else f"[{status}]"
+            )
+            print(label + f" {check.name}" + (f": {detail}" if detail else ""))
         if not report.passed:
             raise SystemExit(1)
         return
@@ -148,8 +204,17 @@ def main() -> None:
     except ValueError as exc:
         parser.exit(1, f"Configuration error: {exc}\n")
 
-    orchestrator = Orchestrator(settings)
-    animation = TerminalAnimation()
+    animation = TerminalAnimation(
+        color=color,
+        enabled=animation_enabled,
+    )
+    orchestrator = Orchestrator(
+        settings,
+        write_progress=animation.show_file_write,
+        command_output=animation.show_command_output,
+        command_started=animation.show_command_started,
+        command_finished=animation.show_command_finished,
+    )
 
     if args.review:
         try:
