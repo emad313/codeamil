@@ -26,6 +26,8 @@ and pauses while CodeAmil waits for command or file-change approval.
 CodeAmil is an assistant, not a complete operating-system sandbox. Approved
 commands run with the permissions of your user account.
 
+CodeAmil is distributed under the [MIT License](./LICENSE).
+
 ## Requirements
 
 - Python 3.10 or newer
