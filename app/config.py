@@ -40,6 +40,7 @@ class Settings:
     require_approval_for_commands: bool
     require_approval_for_file_changes: bool
     review_fix_min_severity: str
+    command_timeout_seconds: int = 600
 
 
 def load_settings() -> Settings:
@@ -65,15 +66,20 @@ def load_settings() -> Settings:
         )
 
     try:
-        max_iterations = int(os.getenv("MAX_AGENT_ITERATIONS", "12"))
+        max_iterations = int(os.getenv("MAX_AGENT_ITERATIONS", "30"))
         max_cycles = int(os.getenv("MAX_REVIEW_FIX_CYCLES", "3"))
+        command_timeout = int(os.getenv("COMMAND_TIMEOUT_SECONDS", "600"))
     except ValueError as exc:
         raise ValueError(
-            "MAX_AGENT_ITERATIONS and MAX_REVIEW_FIX_CYCLES must be integers."
+            "MAX_AGENT_ITERATIONS, MAX_REVIEW_FIX_CYCLES, and "
+            "COMMAND_TIMEOUT_SECONDS must be integers."
         ) from exc
 
-    if max_iterations < 1 or max_cycles < 1:
-        raise ValueError("Iteration and review-fix limits must be at least 1.")
+    if max_iterations < 1 or max_cycles < 1 or command_timeout < 1:
+        raise ValueError(
+            "Iteration, review-fix, and command timeout limits "
+            "must be at least 1."
+        )
 
     approval_value = os.getenv(
         "REQUIRE_APPROVAL_FOR_COMMANDS", "true"
@@ -106,6 +112,7 @@ def load_settings() -> Settings:
             file_approval_value in {"true", "1", "yes", "on"}
         ),
         review_fix_min_severity=min_severity,
+        command_timeout_seconds=command_timeout,
     )
 
 

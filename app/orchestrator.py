@@ -21,6 +21,11 @@ class Orchestrator:
         settings: Settings,
         workspace: str | Path | None = None,
         write_progress: Callable[[str, str], None] | None = None,
+        command_output: Callable[[str], None] | None = None,
+        command_started: Callable[[list[str]], None] | None = None,
+        command_finished: Callable[
+            [list[str], dict[str, object]], None
+        ] | None = None,
     ) -> None:
         self.settings = settings
         self.model_router = ModelRouter(settings)
@@ -33,7 +38,11 @@ class Orchestrator:
 
         self.command_executor = CommandExecutor(
             self.workspace,
+            timeout=settings.command_timeout_seconds,
             require_approval=settings.require_approval_for_commands,
+            output_callback=command_output,
+            command_started=command_started,
+            command_finished=command_finished,
         )
 
         self.registry = create_filesystem_registry(

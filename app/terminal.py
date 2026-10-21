@@ -1,12 +1,23 @@
 import sys
 import threading
-from typing import TextIO
+from typing import Sequence, TextIO
 
 
 class TerminalAnimation:
     """Display a non-intrusive spinner while CodeAmil is working."""
 
     FRAMES = ("|", "/", "-", "\\")
+    COLORS = {
+        "blue": "\033[34m",
+        "cyan": "\033[36m",
+        "green": "\033[32m",
+        "yellow": "\033[33m",
+        "red": "\033[31m",
+        "magenta": "\033[35m",
+        "dim": "\033[2m",
+        "bold": "\033[1m",
+    }
+    RESET = "\033[0m"
 
     def __init__(
         self,
@@ -14,11 +25,15 @@ class TerminalAnimation:
         stream: TextIO | None = None,
         enabled: bool | None = None,
         interval: float = 0.12,
+        color: bool | None = None,
     ) -> None:
         self.stream = stream or sys.stderr
         self.message = message
         self.enabled = (
             self.stream.isatty() if enabled is None else enabled
+        )
+        self.color_enabled = (
+            self.stream.isatty() if color is None else color
         )
         self.interval = interval
         self._stop = threading.Event()
@@ -63,18 +78,85 @@ class TerminalAnimation:
         self.pause()
         try:
             lines = content.splitlines(keepends=True)
-            print(f"\nWriting {relative_path} ({len(lines)} lines):")
+            print(
+                self.paint(
+                    f"\nWriting {relative_path} ({len(lines)} lines):",
+                    "cyan",
+                )
+            )
 
             if not lines:
                 print("  (empty file)")
 
             for line_number, line in enumerate(lines, start=1):
                 displayed = line.rstrip("\r\n")
-                print(f"  {line_number:>4} | {displayed}", flush=True)
+                print(
+                    self.paint(
+                        f"  {line_number:>4} | ",
+                        "dim",
+                    )
+                    + displayed,
+                    flush=True,
+                )
 
-            print(f"Writing {relative_path} now...", flush=True)
+            print(
+                self.paint(f"Writing {relative_path} now...", "green"),
+                flush=True,
+            )
         finally:
             self.resume()
+
+    def show_command_output(self, output: str) -> None:
+        print(output, end="", flush=True)
+
+    def show_command_started(self, command: Sequence[str]) -> None:
+        self.pause()
+        print(
+            self.paint(
+                "\nRunning command (CodeAmil will continue after it finishes):",
+                "yellow",
+            ),
+            flush=True,
+        )
+        print(self.paint(f"  {' '.join(command)}", "bold"), flush=True)
+        print(self.paint("Command output:", "dim"), flush=True)
+
+    def show_command_finished(
+        self,
+        command: Sequence[str],
+        result: dict[str, object],
+    ) -> None:
+        returncode = result.get("returncode")
+        if result.get("ok") is True:
+            print(
+                self.paint(
+                    f"\nCommand finished successfully (exit code {returncode}).",
+                    "green",
+                ),
+                flush=True,
+            )
+        else:
+            error = result.get("error")
+            detail = f": {error}" if error else ""
+            print(
+                self.paint(
+                    f"\nCommand finished unsuccessfully{detail}",
+                    "red",
+                ),
+                flush=True,
+            )
+        self.resume()
+
+    def paint(self, value: str, color: str) -> str:
+        """Apply a named ANSI color when terminal color is enabled."""
+        if not self.color_enabled:
+            return value
+
+        code = self.COLORS.get(color)
+        if code is None:
+            raise ValueError(f"Unknown terminal color: {color}")
+
+        return f"{code}{value}{self.RESET}"
 
     def __enter__(self) -> "TerminalAnimation":
         self.start()
