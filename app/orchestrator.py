@@ -20,9 +20,11 @@ class Orchestrator:
         self,
         settings: Settings,
         workspace: str | Path | None = None,
+        write_progress: Callable[[str, str], None] | None = None,
     ) -> None:
         self.settings = settings
         self.model_router = ModelRouter(settings)
+        self.registry_write_progress = write_progress
 
         # Use the current directory unless a project path is provided.
         self.workspace = Path(
@@ -37,6 +39,7 @@ class Orchestrator:
         self.registry = create_filesystem_registry(
             self.workspace,
             command_executor=self.command_executor,
+            write_progress=write_progress,
         )
 
     def _build_system_prompt(self) -> str:
@@ -142,6 +145,7 @@ Rules:
             model_router=self.model_router,
             max_cycles=self.settings.max_review_fix_cycles,
             min_severity=self.settings.review_fix_min_severity,
+            write_progress=self.registry_write_progress,
         )
 
         return loop.run(

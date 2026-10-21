@@ -107,6 +107,8 @@ on the provider and your account.
 - File changes require explicit approval by default.
 - Commands require explicit approval by default.
 - Proposed file changes are shown as diffs before approval.
+- Approved writes show the target file and its content line by line in the
+  terminal.
 - Tasks report provider errors, tool failures, iteration limits, and
   verification results instead of claiming success.
 

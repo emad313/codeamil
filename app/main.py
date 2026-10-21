@@ -148,8 +148,11 @@ def main() -> None:
     except ValueError as exc:
         parser.exit(1, f"Configuration error: {exc}\n")
 
-    orchestrator = Orchestrator(settings)
     animation = TerminalAnimation()
+    orchestrator = Orchestrator(
+        settings,
+        write_progress=animation.show_file_write,
+    )
 
     if args.review:
         try:

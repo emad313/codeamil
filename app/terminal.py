@@ -58,6 +58,24 @@ class TerminalAnimation:
     def resume(self) -> None:
         self.start()
 
+    def show_file_write(self, relative_path: str, content: str) -> None:
+        """Show each line immediately before a file is written."""
+        self.pause()
+        try:
+            lines = content.splitlines(keepends=True)
+            print(f"\nWriting {relative_path} ({len(lines)} lines):")
+
+            if not lines:
+                print("  (empty file)")
+
+            for line_number, line in enumerate(lines, start=1):
+                displayed = line.rstrip("\r\n")
+                print(f"  {line_number:>4} | {displayed}", flush=True)
+
+            print(f"Writing {relative_path} now...", flush=True)
+        finally:
+            self.resume()
+
     def __enter__(self) -> "TerminalAnimation":
         self.start()
         return self

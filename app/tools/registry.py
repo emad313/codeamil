@@ -269,9 +269,10 @@ class ToolRegistry:
 def create_filesystem_registry(
     workspace: str | Path,
     command_executor: CommandExecutor | None = None,
+    write_progress: Callable[[str, str], None] | None = None,
 ) -> ToolRegistry:
     """Create the filesystem registry with optional command execution."""
-    fs = WorkspaceFileSystem(workspace)
+    fs = WorkspaceFileSystem(workspace, write_progress=write_progress)
     registry = ToolRegistry()
 
     registry.register(

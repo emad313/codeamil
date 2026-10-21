@@ -36,6 +36,7 @@ class ReviewFixLoop:
         model_router: ModelRouter,
         max_cycles: int = 3,
         min_severity: str = "high",
+        write_progress: Callable[[str, str], None] | None = None,
     ) -> None:
         if max_cycles < 1:
             raise ValueError("max_cycles must be at least 1.")
@@ -54,7 +55,10 @@ class ReviewFixLoop:
         self.min_severity = min_severity
         self.min_severity_rank = SEVERITY_ORDER[min_severity]
 
-        self.registry = create_filesystem_registry(self.workspace)
+        self.registry = create_filesystem_registry(
+            self.workspace,
+            write_progress=write_progress,
+        )
         self.reviewer = CodeReviewer(model_router)
         self.coder = CoderAgent(model_router)
         self.qa = QAAgent(self.workspace)
